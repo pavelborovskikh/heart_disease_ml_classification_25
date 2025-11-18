@@ -1,0 +1,49 @@
+# Fly.io Configuration - Free Tier Only
+# ML Zoomcamp Heart Disease Prediction API
+
+app = "heart-disease-ml"
+primary_region = "fra"  # Frankfurt - closest to Berlin
+
+[build]
+
+[env]
+  PORT = "8000"
+
+# HTTP Service Configuration
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+# Port Configuration (fixes the warning)
+[[http_service.ports]]
+  port = 80
+  handlers = ["http"]
+  force_https = true
+
+[[http_service.ports]]
+  port = 443
+  handlers = ["tls", "http"]
+
+# Connection Concurrency
+[http_service.concurrency]
+  type = "connections"
+  hard_limit = 25
+  soft_limit = 20
+
+# Health Checks
+[[http_service.http_checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/health"
+
+# VM Configuration - FREE TIER (256MB)
+[[vm]]
+  memory = '256mb'  # Free tier limit
+  cpu_kind = 'shared'
+  cpus = 1
