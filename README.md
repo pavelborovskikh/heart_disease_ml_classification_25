@@ -671,9 +671,9 @@ This project is created for educational purposes as part of the ML Zoomcamp cour
 ## 📞 Support
 
 For questions or issues:
-1. Check the [QUICKSTART.md](QUICKSTART.md) guide
+1. Check the [quickstart.md](quickstart.md) guide
 2. Review the [API documentation](https://heart-disease-ml.fly.dev/docs)
-3. Check [SUBMISSION_CHECKLIST.md](SUBMISSION_CHECKLIST.md)
+3. Check [submission_checklist.md](submission_checklist.md)
 
 ---
 
