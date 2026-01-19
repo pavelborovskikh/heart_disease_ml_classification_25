@@ -3,9 +3,9 @@ requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "heart-disease-ml"
+name = "house-price-ml"
 version = "1.0.0"
-description = "ML Zoomcamp 25 Heart Disease Classification Midterm Project"
+description = "ML Zoomcamp Capstone: House Price Prediction Project"
 requires-python = ">=3.10"
 authors = [
     {name = "ML Zoomcamp Student", email = "student@example.com"}

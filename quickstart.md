@@ -1,168 +1,162 @@
-# Quick Start Guide
+# 🚀 Quick Start Guide - House Price Prediction API
 
-Get your Heart Disease ML API running in 5 minutes!
+Get the House Price Prediction API up and running in 5 minutes!
 
 ## Prerequisites
 
-- Python 3.10+ installed
-- `uv` package manager (or pip)
-- Git (optional)
+- Python 3.11 or higher
+- pip or uv package manager
+- Git (optional, for cloning)
 
-## 1. Install Dependencies
+## 5-Step Setup
 
-### Using uv (Recommended - Fast!)
+### Step 1: Clone or Download
+
 ```bash
-# Install uv if you haven't already
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install dependencies
-uv sync
+git clone https://github.com/pavelborovskikh/heart_disease_ml_classification_25.git
+cd heart_disease_ml_classification_25
 ```
 
-### Using pip (Alternative)
-```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+### Step 2: Install Dependencies
 
-# Install dependencies
-pip install pandas numpy scikit-learn xgboost fastapi uvicorn pydantic joblib requests
+**Option A: Using pip**
+```bash
+pip install pandas numpy scikit-learn xgboost fastapi uvicorn pydantic joblib
 ```
 
-## 2. Train the Model
+**Option B: Using uv (faster)**
+```bash
+pip install uv
+uv pip install --system pandas numpy scikit-learn xgboost fastapi uvicorn pydantic joblib
+```
+
+### Step 3: Train the Model
 
 ```bash
-# Using uv
-uv run python train.py
-
-# Using pip
 python train.py
 ```
 
-This creates `model.pkl` and `preprocessor.pkl` files.
-
-## 3. Run the API
-
-```bash
-# Using uv
-uv run uvicorn app:app --reload
-
-# Using pip
-uvicorn app:app --reload
+Expected output:
+```
+============================================================
+Starting ML Zoomcamp House Price Prediction Training
+============================================================
+...
+✅ Training pipeline completed successfully!
 ```
 
-The API will be available at: **http://localhost:8000**
+This creates:
+- `model.pkl` - Trained Random Forest model
+- `preprocessor.pkl` - Fitted preprocessing pipeline
 
-## 4. Test the API
+### Step 4: Start the API
 
-### Option 1: Interactive Docs
-Open your browser: **http://localhost:8000/docs**
-
-### Option 2: Test Script
 ```bash
-# Local testing
-uv run python test.py
-
-# For deployed API (update URL in test.py first)
-uv run python test.py
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-### Option 3: curl
+You should see:
+```
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+### Step 5: Test the API
+
+Open a new terminal and run:
+
+```bash
+python test.py
+```
+
+Or test with cURL:
 ```bash
 curl -X POST "http://localhost:8000/predict" \
   -H "Content-Type: application/json" \
   -d '{
-    "age": 63,
-    "sex": 1,
-    "cp": 3,
-    "trestbps": 145,
-    "chol": 233,
-    "fbs": 1,
-    "restecg": 0,
-    "thalch": 150,
-    "exang": 0,
-    "oldpeak": 2.3,
-    "slope": 0,
-    "ca": 0,
-    "thal": 1,
-    "dataset": "Cleveland"
+    "bedrooms": 3,
+    "bathrooms": 2.0,
+    "sqft_living": 2000,
+    "sqft_lot": 5000,
+    "floors": 1.0,
+    "waterfront": 0,
+    "view": 0,
+    "condition": 3,
+    "grade": 7,
+    "sqft_above": 1500,
+    "sqft_basement": 500,
+    "yr_built": 1990,
+    "zipcode": 98001,
+    "lat": 47.3073,
+    "long": -122.2108,
+    "sqft_living15": 1900,
+    "sqft_lot15": 4800
   }'
 ```
 
-## 5. Deploy to Fly.io (Optional)
+## 🐳 Docker Quick Start (Alternative)
+
+If you prefer Docker:
 
 ```bash
-# Install Fly CLI
-# Windows: iwr https://fly.io/install.ps1 -useb | iex
-# Mac/Linux: curl -L https://fly.io/install.sh | sh
+# Build image
+docker build -t house-price-api .
 
-# Login
-fly auth login
-
-# Deploy
-fly deploy
-
-# Open your deployed API
-fly open /docs
+# Run container
+docker run -p 8000:8000 house-price-api
 ```
 
-Your API will be live at: `https://heart-disease-ml.fly.dev`
+Done! The API is at `http://localhost:8000`
 
-## Troubleshooting
+## 📚 Next Steps
 
-### Port Already in Use
+- Visit http://localhost:8000/docs for interactive API documentation
+- Check out `notebook.ipynb` for exploratory data analysis
+- Run `pytest test_api.py -v` for unit tests
+- Read `README.md` for detailed documentation
+
+## ❓ Troubleshooting
+
+### Port 8000 already in use
 ```bash
-# Kill the process using port 8000
-# Windows: netstat -ano | findstr :8000
-# Linux/Mac: lsof -ti:8000 | xargs kill -9
+# Use a different port
+uvicorn app:app --host 0.0.0.0 --port 8080
 ```
 
-### Model Files Missing
+### ModuleNotFoundError
 ```bash
-# Retrain the model
-uv run python train.py
+# Make sure all dependencies are installed
+pip install pandas numpy scikit-learn xgboost fastapi uvicorn pydantic joblib
 ```
 
-### Fly.io Timeout on First Request
+### Model file not found
 ```bash
-# Wake up the machine first
-curl https://heart-disease-ml.fly.dev/health
-
-# Wait 10 seconds, then test
-uv run python test.py
+# Train the model first
+python train.py
 ```
 
-### Import Errors
+## �� Quick Commands Reference
+
 ```bash
-# Reinstall dependencies
-uv sync --force
+# Train model
+python train.py
+
+# Start API server
+uvicorn app:app --reload
+
+# Run tests
+python test.py
+python test_api.py
+pytest test_api.py -v
+
+# Docker build & run
+docker build -t house-price-api .
+docker run -p 8000:8000 house-price-api
+
+# Check API health
+curl http://localhost:8000/health
 ```
-
-## Next Steps
-
-1. **Explore the API**: Visit `/docs` for interactive documentation
-2. **Check Performance**: Review model metrics in training output
-3. **Customize**: Modify `train.py` to experiment with different models
-4. **Monitor**: Use `fly logs` to monitor your deployed API
-
-## Quick Reference
-
-| Command | Description |
-|---------|-------------|
-| `uv sync` | Install dependencies |
-| `uv run python train.py` | Train model |
-| `uv run uvicorn app:app --reload` | Start API locally |
-| `uv run python test.py` | Run tests |
-| `fly deploy` | Deploy to Fly.io |
-| `fly logs` | View deployment logs |
-| `fly status` | Check deployment status |
-
-## Need Help?
-
-- Check the main [README.md](README.md) for detailed documentation
-- Review [SUBMISSION_CHECKLIST.md](SUBMISSION_CHECKLIST.md) for project requirements
-- Visit the Swagger UI at `/docs` for API documentation
 
 ---
 
-**Ready in 5 minutes!** 🚀
+**Need help?** Check the full [README.md](README.md) or open an issue on GitHub.

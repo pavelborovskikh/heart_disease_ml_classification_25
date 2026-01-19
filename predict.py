@@ -1,5 +1,5 @@
 """
-Prediction service for Heart Disease Classification.
+Prediction service for House Price Prediction.
 Handles single and batch predictions with proper preprocessing.
 """
 
@@ -13,12 +13,21 @@ from typing import Dict, List, Any
 logger = logging.getLogger(__name__)
 
 # Feature definitions
-NUMERIC_FEATURES = ["age", "trestbps", "chol", "thalch", "oldpeak"]
-CATEGORICAL_FEATURES = ["sex", "dataset", "cp", "fbs", "restecg", "exang", "slope", "ca", "thal"]
+NUMERIC_FEATURES = [
+    "bedrooms", "bathrooms", "sqft_living", "sqft_lot", "floors",
+    "sqft_above", "sqft_basement", "yr_built", "lat", "long",
+    "sqft_living15", "sqft_lot15"
+]
+CATEGORICAL_FEATURES = [
+    "waterfront", "view", "condition", "grade", "zipcode"
+]
 ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 
 MODEL_PATH = "model.pkl"
 PREPROCESSOR_PATH = "preprocessor.pkl"
+
+# Prediction uncertainty factor (15% of predicted value for confidence interval)
+PREDICTION_UNCERTAINTY_FACTOR = 0.15
 
 
 class PredictionService:
@@ -85,12 +94,14 @@ class PredictionService:
         Make a single prediction.
         
         Args:
-            data: Dictionary with features for one sample
-                 Expected keys: age, sex, cp, trestbps, chol, fbs, restecg,
-                               thalch, exang, oldpeak, slope, ca, thal, dataset
+            data: Dictionary with features for one house
+                 Expected keys: bedrooms, bathrooms, sqft_living, sqft_lot, floors,
+                               waterfront, view, condition, grade, sqft_above, 
+                               sqft_basement, yr_built, zipcode, lat, long,
+                               sqft_living15, sqft_lot15
         
         Returns:
-            Dictionary with prediction and probability
+            Dictionary with prediction and metadata
         """
         try:
             # Prepare data
@@ -98,13 +109,16 @@ class PredictionService:
             
             # Use model's built-in preprocessing pipeline
             prediction = self.model.predict(df)[0]
-            probability = self.model.predict_proba(df)[0][1]
+            
+            # For regression, we don't have probability but can provide prediction interval
+            # Using a simple approximation based on model performance
+            prediction_std = prediction * PREDICTION_UNCERTAINTY_FACTOR
             
             return {
-                "prediction": int(prediction),
-                "probability": float(probability),
-                "heart_disease": bool(prediction),
-                "confidence": float(max(self.model.predict_proba(df)[0]))
+                "predicted_price": float(prediction),
+                "price_lower": float(prediction - 1.96 * prediction_std),
+                "price_upper": float(prediction + 1.96 * prediction_std),
+                "formatted_price": f"${prediction:,.2f}"
             }
         except Exception as e:
             logger.error(f"Error during prediction: {str(e)}")
@@ -115,7 +129,7 @@ class PredictionService:
         Make predictions for multiple samples.
         
         Args:
-            data_list: List of dictionaries, each containing features for one sample
+            data_list: List of dictionaries, each containing features for one house
         
         Returns:
             List of prediction dictionaries
@@ -127,17 +141,16 @@ class PredictionService:
             
             # Make predictions
             predictions = self.model.predict(df_batch)
-            probabilities = self.model.predict_proba(df_batch)[:, 1]
-            confidences = np.max(self.model.predict_proba(df_batch), axis=1)
             
             results = []
-            for i, (pred, prob, conf) in enumerate(zip(predictions, probabilities, confidences)):
+            for i, pred in enumerate(predictions):
+                prediction_std = pred * PREDICTION_UNCERTAINTY_FACTOR
                 results.append({
                     "sample": i,
-                    "prediction": int(pred),
-                    "probability": float(prob),
-                    "heart_disease": bool(pred),
-                    "confidence": float(conf)
+                    "predicted_price": float(pred),
+                    "price_lower": float(pred - 1.96 * prediction_std),
+                    "price_upper": float(pred + 1.96 * prediction_std),
+                    "formatted_price": f"${pred:,.2f}"
                 })
             
             return results

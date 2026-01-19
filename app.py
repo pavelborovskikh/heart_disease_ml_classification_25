@@ -1,5 +1,5 @@
 """
-FastAPI application for Heart Disease Classification ML model.
+FastAPI application for House Price Prediction ML model.
 Handles predictions via REST API endpoints.
 """
 
@@ -43,8 +43,8 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Heart Disease Classification API",
-    description="ML API for predicting heart disease presence using Random Forest",
+    title="House Price Prediction API",
+    description="ML API for predicting house prices in King County using Random Forest",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -54,37 +54,40 @@ app = FastAPI(
 # Pydantic Models
 # ============================================================================
 
-class HeartPredictionRequest(BaseModel):
+class HousePredictionRequest(BaseModel):
     """
-    Request schema for heart disease prediction.
+    Request schema for house price prediction.
     All fields are required.
     """
     model_config = ConfigDict(protected_namespaces=())
     
-    age: int
-    sex: int
-    cp: int
-    trestbps: int
-    chol: int
-    fbs: int
-    restecg: int
-    thalch: int
-    exang: int
-    oldpeak: float
-    slope: int
-    ca: int
-    thal: int
-    dataset: str
+    bedrooms: int
+    bathrooms: float
+    sqft_living: int
+    sqft_lot: int
+    floors: float
+    waterfront: int
+    view: int
+    condition: int
+    grade: int
+    sqft_above: int
+    sqft_basement: int
+    yr_built: int
+    zipcode: int
+    lat: float
+    long: float
+    sqft_living15: int
+    sqft_lot15: int
 
 
 class PredictionResponse(BaseModel):
     """Response schema for prediction results."""
     model_config = ConfigDict(protected_namespaces=())
     
-    prediction: int
-    probability: float
-    heart_disease: bool
-    confidence: float
+    predicted_price: float
+    price_lower: float
+    price_upper: float
+    formatted_price: str
 
 
 class HealthResponse(BaseModel):
@@ -113,7 +116,7 @@ class FeaturesResponse(BaseModel):
 async def root():
     """Root endpoint - welcome message."""
     return {
-        "message": "Heart Disease Classification API",
+        "message": "House Price Prediction API",
         "version": "1.0.0",
         "docs": "/docs"
     }
@@ -128,7 +131,7 @@ async def health_check():
     return {
         "status": "healthy" if service.model is not None else "unhealthy",
         "model_loaded": service.model is not None,
-        "model_type": "RandomForestClassifier with preprocessing pipeline"
+        "model_type": "RandomForestRegressor with preprocessing pipeline"
     }
 
 
@@ -146,31 +149,34 @@ async def get_features():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Predictions"])
-async def predict(request: HeartPredictionRequest):
+async def predict(request: HousePredictionRequest):
     """
-    Make a single prediction for heart disease presence.
+    Make a single prediction for house price.
     
     **Parameters:**
-    - **age**: Patient age (int)
-    - **sex**: Sex (0=female, 1=male)
-    - **cp**: Chest pain type (0-3)
-    - **trestbps**: Resting blood pressure (mm Hg)
-    - **chol**: Serum cholesterol (mg/dl)
-    - **fbs**: Fasting blood sugar > 120 mg/dl (0/1)
-    - **restecg**: Resting electrocardiographic results (0-2)
-    - **thalch**: Maximum heart rate achieved
-    - **exang**: Exercise induced angina (0/1)
-    - **oldpeak**: ST depression induced by exercise
-    - **slope**: Slope of ST segment (0-2)
-    - **ca**: Number of major vessels (0-4)
-    - **thal**: Thalassemia (0-3)
-    - **dataset**: Dataset source (string)
+    - **bedrooms**: Number of bedrooms (int)
+    - **bathrooms**: Number of bathrooms (float, can have .5 for half bath)
+    - **sqft_living**: Square footage of living space (int)
+    - **sqft_lot**: Square footage of lot (int)
+    - **floors**: Number of floors (float, can have .5)
+    - **waterfront**: Waterfront property (0/1)
+    - **view**: Quality of view (0-4)
+    - **condition**: Overall condition (1-5)
+    - **grade**: Overall grade given to the housing unit (1-13)
+    - **sqft_above**: Square footage above ground (int)
+    - **sqft_basement**: Square footage of basement (int)
+    - **yr_built**: Year built (int)
+    - **zipcode**: Zipcode (int)
+    - **lat**: Latitude (float)
+    - **long**: Longitude (float)
+    - **sqft_living15**: Average square footage of 15 nearest houses (int)
+    - **sqft_lot15**: Average lot size of 15 nearest houses (int)
     
     **Returns:**
-    - **prediction**: Binary prediction (0=no disease, 1=disease present)
-    - **probability**: Probability of disease (0-1)
-    - **heart_disease**: Boolean interpretation of prediction
-    - **confidence**: Model confidence score
+    - **predicted_price**: Predicted house price ($)
+    - **price_lower**: Lower bound of 95% prediction interval
+    - **price_upper**: Upper bound of 95% prediction interval
+    - **formatted_price**: Formatted price string
     """
     try:
         result = service.predict(request.model_dump())
@@ -184,12 +190,12 @@ async def predict(request: HeartPredictionRequest):
 
 
 @app.post("/predict/batch", response_model=List[PredictionResponse], tags=["Predictions"])
-async def predict_batch(requests: List[HeartPredictionRequest]):
+async def predict_batch(requests: List[HousePredictionRequest]):
     """
-    Make predictions for multiple patients at once.
+    Make predictions for multiple houses at once.
     
     **Parameters:**
-    - List of HeartPredictionRequest objects
+    - List of HousePredictionRequest objects
     
     **Returns:**
     - List of PredictionResponse objects
@@ -212,13 +218,13 @@ async def model_info():
     Get detailed information about the model and API.
     """
     return {
-        "model_type": "Random Forest Classifier",
+        "model_type": "Random Forest Regressor",
         "framework": "scikit-learn",
         "preprocessing": "StandardScaler + OneHotEncoder via ColumnTransformer",
-        "features_total": 14,
-        "numeric_features": 5,
-        "categorical_features": 9,
-        "target": "Heart disease presence (binary classification)",
+        "features_total": 17,
+        "numeric_features": 12,
+        "categorical_features": 5,
+        "target": "House price in King County, WA (regression)",
         "endpoints": {
             "health": "GET /health",
             "features": "GET /features",

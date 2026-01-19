@@ -13,7 +13,7 @@ RUN uv pip install --system --no-cache pandas numpy scikit-learn xgboost fastapi
 
 # Copy application files
 COPY train.py predict.py app.py ./
-COPY heart_disease_uci.csv ./
+COPY kc_house_data.csv ./
 
 # Train model during build (bake into image)
 RUN python train.py
