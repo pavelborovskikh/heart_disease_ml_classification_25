@@ -1,6 +1,6 @@
 """
-ML Zoomcamp 25 Midterm: Heart Disease Classification Training Pipeline
-Uses Random Forest with preprocessing pipeline for production deployment.
+ML Zoomcamp Capstone: House Price Prediction Training Pipeline
+Uses Random Forest Regressor with preprocessing pipeline for production deployment.
 """
 
 import logging
@@ -10,17 +10,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.metrics import (
-    accuracy_score,
-    roc_auc_score,
-    classification_report,
-    confusion_matrix,
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score,
 )
+from sklearn.linear_model import LinearRegression
+from xgboost import XGBRegressor
 
 # Configure logging
 logging.basicConfig(
@@ -29,27 +30,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Feature definitions - CORRECTED: 'thalch' not 'thalach'
-NUMERIC_FEATURES = ["age", "trestbps", "chol", "thalch", "oldpeak"]
+# Feature definitions
+NUMERIC_FEATURES = [
+    "bedrooms", "bathrooms", "sqft_living", "sqft_lot", "floors",
+    "sqft_above", "sqft_basement", "yr_built", "lat", "long",
+    "sqft_living15", "sqft_lot15"
+]
 CATEGORICAL_FEATURES = [
-    "sex",
-    "dataset",
-    "cp",
-    "fbs",
-    "restecg",
-    "exang",
-    "slope",
-    "ca",
-    "thal",
+    "waterfront", "view", "condition", "grade", "zipcode"
 ]
 
-DATA_FILE = "heart_disease_uci.csv"
+DATA_FILE = "kc_house_data.csv"
 MODEL_OUTPUT_FILE = "model.pkl"
 PREPROCESSOR_OUTPUT_FILE = "preprocessor.pkl"
 
 
 def load_and_prepare_data(filepath: str) -> tuple:
-    """Load data, create binary target, handle missing values."""
+    """Load data, handle missing values, create features."""
     logger.info(f"Loading data from {filepath}")
     df = pd.read_csv(filepath)
     logger.info(f"Dataset shape: {df.shape}")
@@ -57,17 +54,22 @@ def load_and_prepare_data(filepath: str) -> tuple:
 
     logger.info("Starting data preprocessing...")
 
-    # Create binary target: 0 = no disease, 1 = presence of disease
-    df["target"] = (df["num"] > 0).astype(int)
-    logger.info(f"Target distribution:\n{df['target'].value_counts()}")
-
     # Handle duplicates
     initial_rows = len(df)
     df = df.drop_duplicates().reset_index(drop=True)
     logger.info(f"Removed {initial_rows - len(df)} duplicate rows")
 
-    # Handle missing values (convert "?" to NaN if present)
-    df = df.replace("?", np.nan)
+    # Feature engineering
+    df['house_age'] = 2015 - df['yr_built']
+    df['renovated'] = (df['yr_renovated'] > 0).astype(int)
+    df['price_per_sqft'] = df['price'] / df['sqft_living']
+    
+    logger.info(f"Price statistics:")
+    logger.info(f"  Mean: ${df['price'].mean():,.2f}")
+    logger.info(f"  Median: ${df['price'].median():,.2f}")
+    logger.info(f"  Std: ${df['price'].std():,.2f}")
+    logger.info(f"  Min: ${df['price'].min():,.2f}")
+    logger.info(f"  Max: ${df['price'].max():,.2f}")
 
     logger.info(f"Numeric features: {NUMERIC_FEATURES}")
     logger.info(f"Categorical features: {CATEGORICAL_FEATURES}")
@@ -101,6 +103,51 @@ def build_preprocessor() -> ColumnTransformer:
     return preprocessor
 
 
+def evaluate_model(name: str, model: Pipeline, X_test: pd.DataFrame, y_test: np.ndarray) -> dict:
+    """Evaluate a trained model and return metrics."""
+    y_pred = model.predict(X_test)
+    
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    mae = mean_absolute_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+    
+    logger.info(f"\n{name} Results:")
+    logger.info(f"  RMSE: ${rmse:,.2f}")
+    logger.info(f"  MAE: ${mae:,.2f}")
+    logger.info(f"  R² Score: {r2:.4f}")
+    
+    return {
+        "name": name,
+        "rmse": rmse,
+        "mae": mae,
+        "r2": r2
+    }
+
+
+def train_linear_regression(
+    X_train: pd.DataFrame,
+    y_train: np.ndarray,
+    X_test: pd.DataFrame,
+    y_test: np.ndarray,
+) -> tuple:
+    """Train Linear Regression baseline model."""
+    logger.info("Training Linear Regression baseline...")
+    
+    preprocessor = build_preprocessor()
+    
+    model = Pipeline(
+        steps=[
+            ("preprocess", preprocessor),
+            ("model", LinearRegression()),
+        ]
+    )
+    
+    model.fit(X_train, y_train)
+    metrics = evaluate_model("Linear Regression", model, X_test, y_test)
+    
+    return model, metrics
+
+
 def train_random_forest(
     X_train: pd.DataFrame,
     y_train: np.ndarray,
@@ -108,7 +155,7 @@ def train_random_forest(
     y_test: np.ndarray,
 ) -> tuple:
     """Train Random Forest with hyperparameter tuning."""
-    logger.info("Building Random Forest pipeline...")
+    logger.info("\nBuilding Random Forest pipeline...")
 
     preprocessor = build_preprocessor()
 
@@ -119,8 +166,8 @@ def train_random_forest(
             ("preprocess", preprocessor),
             (
                 "model",
-                RandomForestClassifier(
-                    n_estimators=200,
+                RandomForestRegressor(
+                    n_estimators=100,
                     random_state=42,
                     n_jobs=-1,
                     verbose=0,
@@ -130,25 +177,14 @@ def train_random_forest(
     )
 
     rf_baseline.fit(X_train, y_train)
-
-    y_pred_baseline = rf_baseline.predict(X_test)
-    y_proba_baseline = rf_baseline.predict_proba(X_test)[:, 1]
-
-    baseline_accuracy = accuracy_score(y_test, y_pred_baseline)
-    baseline_roc_auc = roc_auc_score(y_test, y_proba_baseline)
-
-    logger.info(f"Baseline Random Forest - Accuracy: {baseline_accuracy:.4f}")
-    logger.info(f"Baseline Random Forest - ROC AUC: {baseline_roc_auc:.4f}")
-    logger.info(
-        f"\nBaseline Classification Report:\n{classification_report(y_test, y_pred_baseline)}"
-    )
+    baseline_metrics = evaluate_model("Random Forest (Baseline)", rf_baseline, X_test, y_test)
 
     # Hyperparameter tuning
     logger.info("\nStarting hyperparameter tuning (RandomizedSearchCV)...")
 
     rf_param_dist = {
         "model__n_estimators": [100, 200, 300],
-        "model__max_depth": [None, 5, 8, 10],
+        "model__max_depth": [None, 10, 20, 30],
         "model__min_samples_split": [2, 5, 10],
         "model__min_samples_leaf": [1, 2, 4],
         "model__max_features": ["sqrt", "log2"],
@@ -160,13 +196,13 @@ def train_random_forest(
                 ("preprocess", preprocessor),
                 (
                     "model",
-                    RandomForestClassifier(random_state=42, n_jobs=-1, verbose=0),
+                    RandomForestRegressor(random_state=42, n_jobs=-1, verbose=0),
                 ),
             ]
         ),
         param_distributions=rf_param_dist,
         n_iter=15,
-        scoring="roc_auc",
+        scoring="neg_root_mean_squared_error",
         cv=5,
         verbose=1,
         n_jobs=-1,
@@ -176,24 +212,46 @@ def train_random_forest(
     rf_random_search.fit(X_train, y_train)
 
     logger.info(f"Best RF params: {rf_random_search.best_params_}")
-    logger.info(f"Best RF CV ROC AUC: {rf_random_search.best_score_:.4f}")
+    logger.info(f"Best RF CV RMSE: ${-rf_random_search.best_score_:,.2f}")
 
     best_rf = rf_random_search.best_estimator_
+    tuned_metrics = evaluate_model("Random Forest (Tuned)", best_rf, X_test, y_test)
 
-    y_pred_tuned = best_rf.predict(X_test)
-    y_proba_tuned = best_rf.predict_proba(X_test)[:, 1]
+    return best_rf, preprocessor, tuned_metrics
 
-    tuned_accuracy = accuracy_score(y_test, y_pred_tuned)
-    tuned_roc_auc = roc_auc_score(y_test, y_proba_tuned)
 
-    logger.info(f"\nTuned Random Forest - Accuracy: {tuned_accuracy:.4f}")
-    logger.info(f"Tuned Random Forest - ROC AUC: {tuned_roc_auc:.4f}")
-    logger.info(
-        f"\nTuned Classification Report:\n{classification_report(y_test, y_pred_tuned)}"
+def train_xgboost(
+    X_train: pd.DataFrame,
+    y_train: np.ndarray,
+    X_test: pd.DataFrame,
+    y_test: np.ndarray,
+) -> tuple:
+    """Train XGBoost Regressor."""
+    logger.info("\nTraining XGBoost Regressor...")
+    
+    preprocessor = build_preprocessor()
+    
+    model = Pipeline(
+        steps=[
+            ("preprocess", preprocessor),
+            (
+                "model",
+                XGBRegressor(
+                    n_estimators=200,
+                    learning_rate=0.1,
+                    max_depth=7,
+                    random_state=42,
+                    n_jobs=-1,
+                    verbosity=0,
+                ),
+            ),
+        ]
     )
-    logger.info(f"Confusion Matrix:\n{confusion_matrix(y_test, y_pred_tuned)}")
-
-    return best_rf, preprocessor
+    
+    model.fit(X_train, y_train)
+    metrics = evaluate_model("XGBoost", model, X_test, y_test)
+    
+    return model, metrics
 
 
 def save_model_and_preprocessor(
@@ -215,7 +273,7 @@ def main():
     """Main training pipeline."""
     try:
         logger.info("=" * 60)
-        logger.info("Starting ML Zoomcamp Heart Disease Classification Training")
+        logger.info("Starting ML Zoomcamp House Price Prediction Training")
         logger.info("=" * 60)
 
         # 1. Load and prepare data
@@ -223,22 +281,52 @@ def main():
 
         # 2. Prepare features and target
         X = df[NUMERIC_FEATURES + CATEGORICAL_FEATURES].copy()
-        y = df["target"].values
+        y = df["price"].values
 
-        # 3. Train-test split (stratified for balanced classes)
+        # 3. Train-test split
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
+            X, y, test_size=0.2, random_state=42
         )
         logger.info(
             f"Train set: {X_train.shape[0]} samples | Test set: {X_test.shape[0]} samples"
         )
 
-        # 4. Train Random Forest with tuning
-        best_model, preprocessor = train_random_forest(
+        # 4. Train multiple models
+        all_metrics = []
+        
+        # Linear Regression
+        lr_model, lr_metrics = train_linear_regression(X_train, y_train, X_test, y_test)
+        all_metrics.append(lr_metrics)
+        
+        # Random Forest with tuning
+        rf_model, preprocessor, rf_metrics = train_random_forest(
             X_train, y_train, X_test, y_test
         )
+        all_metrics.append(rf_metrics)
+        
+        # XGBoost
+        xgb_model, xgb_metrics = train_xgboost(X_train, y_train, X_test, y_test)
+        all_metrics.append(xgb_metrics)
 
-        # 5. Save model and preprocessor
+        # 5. Select best model based on R² score
+        logger.info("\n" + "=" * 60)
+        logger.info("Model Comparison Summary")
+        logger.info("=" * 60)
+        for metrics in all_metrics:
+            logger.info(
+                f"{metrics['name']}: "
+                f"RMSE=${metrics['rmse']:,.2f}, "
+                f"MAE=${metrics['mae']:,.2f}, "
+                f"R²={metrics['r2']:.4f}"
+            )
+        
+        best_model_metrics = max(all_metrics, key=lambda x: x['r2'])
+        logger.info(f"\n✅ Best Model: {best_model_metrics['name']} (R²={best_model_metrics['r2']:.4f})")
+        
+        # Save the Random Forest model (typically best for this use case)
+        best_model = rf_model
+
+        # 6. Save model and preprocessor
         save_model_and_preprocessor(best_model, preprocessor)
 
         logger.info("=" * 60)

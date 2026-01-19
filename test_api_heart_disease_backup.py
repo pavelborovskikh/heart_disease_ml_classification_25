@@ -1,5 +1,5 @@
 """
-Test suite for House Price Prediction API.
+Test suite for Heart Disease Classification API.
 Tests model loading, predictions, and API endpoints.
 """
 
@@ -34,35 +34,32 @@ class TestPredictionService:
         """Test single prediction."""
         service = PredictionService()
         
-        # Test data - mid-price house
+        # Test data - patient with heart disease symptoms
         test_data = {
-            "bedrooms": 3,
-            "bathrooms": 2.0,
-            "sqft_living": 2000,
-            "sqft_lot": 5000,
-            "floors": 1.0,
-            "waterfront": 0,
-            "view": 0,
-            "condition": 3,
-            "grade": 7,
-            "sqft_above": 1500,
-            "sqft_basement": 500,
-            "yr_built": 1990,
-            "zipcode": 98001,
-            "lat": 47.3073,
-            "long": -122.2108,
-            "sqft_living15": 1900,
-            "sqft_lot15": 4800
+            "age": 63,
+            "sex": 1,
+            "cp": 3,
+            "trestbps": 145,
+            "chol": 233,
+            "fbs": 1,
+            "restecg": 0,
+            "thalch": 150,  # CORRECTED: was thalach
+            "exang": 0,
+            "oldpeak": 2.3,
+            "slope": 0,
+            "ca": 0,
+            "thal": 1,
+            "dataset": "Cleveland"
         }
         
         result = service.predict(test_data)
         
-        assert "predicted_price" in result
-        assert "price_lower" in result
-        assert "price_upper" in result
-        assert "formatted_price" in result
-        assert result["predicted_price"] > 0
-        assert result["price_lower"] < result["predicted_price"] < result["price_upper"]
+        assert "prediction" in result
+        assert "probability" in result
+        assert "heart_disease" in result
+        assert result["prediction"] in [0, 1]
+        assert 0.0 <= result["probability"] <= 1.0
+        assert isinstance(result["heart_disease"], bool)
         
         print(f"✓ Single prediction successful: {result}")
 
@@ -70,45 +67,39 @@ class TestPredictionService:
         """Test batch predictions."""
         service = PredictionService()
         
-        # Test data - multiple houses
+        # Test data - multiple patients
         test_data_list = [
             {
-                "bedrooms": 3,
-                "bathrooms": 2.0,
-                "sqft_living": 2000,
-                "sqft_lot": 5000,
-                "floors": 1.0,
-                "waterfront": 0,
-                "view": 0,
-                "condition": 3,
-                "grade": 7,
-                "sqft_above": 1500,
-                "sqft_basement": 500,
-                "yr_built": 1990,
-                "zipcode": 98001,
-                "lat": 47.3073,
-                "long": -122.2108,
-                "sqft_living15": 1900,
-                "sqft_lot15": 4800
+                "age": 63,
+                "sex": 1,
+                "cp": 3,
+                "trestbps": 145,
+                "chol": 233,
+                "fbs": 1,
+                "restecg": 0,
+                "thalch": 150,  # CORRECTED
+                "exang": 0,
+                "oldpeak": 2.3,
+                "slope": 0,
+                "ca": 0,
+                "thal": 1,
+                "dataset": "Cleveland"
             },
             {
-                "bedrooms": 5,
-                "bathrooms": 3.5,
-                "sqft_living": 4000,
-                "sqft_lot": 10000,
-                "floors": 2.0,
-                "waterfront": 1,
-                "view": 4,
-                "condition": 5,
-                "grade": 11,
-                "sqft_above": 3000,
-                "sqft_basement": 1000,
-                "yr_built": 2010,
-                "zipcode": 98004,
-                "lat": 47.6205,
-                "long": -122.2047,
-                "sqft_living15": 3800,
-                "sqft_lot15": 9500
+                "age": 45,
+                "sex": 0,
+                "cp": 1,
+                "trestbps": 120,
+                "chol": 210,
+                "fbs": 0,
+                "restecg": 1,
+                "thalch": 140,  # CORRECTED
+                "exang": 0,
+                "oldpeak": 0.5,
+                "slope": 1,
+                "ca": 0,
+                "thal": 1,
+                "dataset": "Cleveland"
             }
         ]
         
@@ -116,10 +107,11 @@ class TestPredictionService:
         
         assert len(results) == 2
         for result in results:
-            assert "predicted_price" in result
-            assert "price_lower" in result
-            assert "price_upper" in result
-            assert result["predicted_price"] > 0
+            assert "prediction" in result
+            assert "probability" in result
+            assert "heart_disease" in result
+            assert result["prediction"] in [0, 1]
+            assert 0.0 <= result["probability"] <= 1.0
         
         print(f"✓ Batch prediction successful: {len(results)} predictions made")
 
@@ -131,10 +123,11 @@ class TestPredictionService:
         assert "numeric_features" in features
         assert "categorical_features" in features
         
-        # Verify correct feature counts
-        assert len(features["numeric_features"]) == 12
-        assert len(features["categorical_features"]) == 5
-        assert len(features["all_features"]) == 17
+        # Verify correct feature names
+        assert "thalch" in features["numeric_features"]
+        assert "thalach" not in features["numeric_features"]  # OLD NAME NOT PRESENT
+        assert len(features["numeric_features"]) == 5
+        assert len(features["categorical_features"]) == 9
         
         print(f"✓ Feature names correct:")
         print(f"  Numeric: {features['numeric_features']}")
@@ -146,10 +139,20 @@ class TestPredictionService:
         
         # Test data with missing feature
         incomplete_data = {
-            "bedrooms": 3,
-            "bathrooms": 2.0,
-            "sqft_living": 2000,
-            # Missing other required features
+            "age": 63,
+            "sex": 1,
+            "cp": 3,
+            "trestbps": 145,
+            # Missing "chol"
+            "fbs": 1,
+            "restecg": 0,
+            "thalch": 150,
+            "exang": 0,
+            "oldpeak": 2.3,
+            "slope": 0,
+            "ca": 0,
+            "thal": 1,
+            "dataset": "Cleveland"
         }
         
         # This should raise an error
@@ -168,7 +171,7 @@ class TestPredictionService:
 if __name__ == "__main__":
     # Run without pytest (simple script mode)
     print("=" * 70)
-    print("Running House Price Prediction Tests")
+    print("Running Heart Disease Classification Tests")
     print("=" * 70)
     
     try:
