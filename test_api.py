@@ -172,8 +172,17 @@ if __name__ == "__main__":
     print("=" * 70)
     
     try:
+        # Check if model files exist
+        if not os.path.exists("model.pkl"):
+            raise FileNotFoundError(
+                "model.pkl not found. Run 'python train.py' first to train and save the model."
+            )
+        if not os.path.exists("preprocessor.pkl"):
+            raise FileNotFoundError(
+                "preprocessor.pkl not found. Run 'python train.py' first."
+            )
+        
         test = TestPredictionService()
-        test.setup()
         
         print("\n[1/5] Testing PredictionService Initialization...")
         test.test_prediction_service_init()
