@@ -323,8 +323,13 @@ def main():
         best_model_metrics = max(all_metrics, key=lambda x: x['r2'])
         logger.info(f"\n✅ Best Model: {best_model_metrics['name']} (R²={best_model_metrics['r2']:.4f})")
         
-        # Save the Random Forest model (typically best for this use case)
-        best_model = rf_model
+        # Select the actual best model
+        if best_model_metrics['name'] == 'Linear Regression':
+            best_model = lr_model
+        elif best_model_metrics['name'] == 'XGBoost':
+            best_model = xgb_model
+        else:  # Random Forest (Tuned)
+            best_model = rf_model
 
         # 6. Save model and preprocessor
         save_model_and_preprocessor(best_model, preprocessor)

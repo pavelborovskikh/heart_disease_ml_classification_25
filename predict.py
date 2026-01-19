@@ -26,6 +26,9 @@ ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 MODEL_PATH = "model.pkl"
 PREPROCESSOR_PATH = "preprocessor.pkl"
 
+# Prediction uncertainty factor (15% of predicted value for confidence interval)
+PREDICTION_UNCERTAINTY_FACTOR = 0.15
+
 
 class PredictionService:
     """
@@ -109,7 +112,7 @@ class PredictionService:
             
             # For regression, we don't have probability but can provide prediction interval
             # Using a simple approximation based on model performance
-            prediction_std = prediction * 0.15  # Approximate 15% uncertainty
+            prediction_std = prediction * PREDICTION_UNCERTAINTY_FACTOR
             
             return {
                 "predicted_price": float(prediction),
@@ -141,7 +144,7 @@ class PredictionService:
             
             results = []
             for i, pred in enumerate(predictions):
-                prediction_std = pred * 0.15
+                prediction_std = pred * PREDICTION_UNCERTAINTY_FACTOR
                 results.append({
                     "sample": i,
                     "predicted_price": float(pred),
